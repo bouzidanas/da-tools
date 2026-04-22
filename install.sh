@@ -100,7 +100,10 @@ if [ ${#TOOLS[@]} -eq 0 ]; then
     exit 1
 fi
 
-step "${ACTION^}ing: ${TOOLS[*]}"
+# Capitalize first letter of ACTION (portable across bash versions)
+ACTION_TITLE="$(printf '%s' "${ACTION:0:1}" | tr '[:lower:]' '[:upper:]')${ACTION:1}ing"
+
+step "$ACTION_TITLE: ${TOOLS[*]}"
 
 for tool in "${TOOLS[@]}"; do
     run_tool_action "$ACTION" "$tool"
