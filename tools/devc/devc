@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# devc — launch any folder as a VS Code dev container using the default template.
+# Part of da-tools: https://github.com/bouzidanas/da-tools
+
+set -euo pipefail
+
+# Template lookup order:
+#   1. $DEVC_TEMPLATE  (override)
+#   2. $XDG_DATA_HOME/da-tools/devc/devcontainer-default
+#   3. ~/.local/share/da-tools/devc/devcontainer-default
+#   4. ~/.devcontainer-default  (legacy)
+TEMPLATE_DIR="${DEVC_TEMPLATE:-${XDG_DATA_HOME:-$HOME/.local/share}/da-tools/devc/devcontainer-default}"
+if [ ! -d "$TEMPLATE_DIR" ] && [ -d "$HOME/.devcontainer-default" ]; then
+    TEMPLATE_DIR="$HOME/.devcontainer-default"
+fi
+
+usage() {
+    cat <<EOF
+devc — launch a folder as a VS Code dev container
+
+Usage:
+  devc [DIR]            Copy template into DIR (default: .) and open in VS Code
+  devc -h | --help      Show this help
+
+Environment:
+  DEVC_TEMPLATE         Override path to the .devcontainer template directory
+EOF
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+esac
+
+TARGET_DIR="${1:-.}"
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
+if [ ! -d "$TEMPLATE_DIR" ]; then
+    echo "Error: template not found at $TEMPLATE_DIR" >&2
+    echo "Install via: curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc" >&2
+    exit 1
+fi
+
+if [ -e "$TARGET_DIR/.devcontainer" ]; then
+    echo ".devcontainer already exists in $TARGET_DIR"
+    read -rp "Overwrite with template? [y/N] " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+        rm -rf "$TARGET_DIR/.devcontainer"
+    else
+        echo "Opening as-is..."
+        code "$TARGET_DIR"
+        exit 0
+    fi
+fi
+
+cp -r "$TEMPLATE_DIR" "$TARGET_DIR/.devcontainer"
+echo "Copied .devcontainer template into $TARGET_DIR"
+
+code "$TARGET_DIR"
+echo "Opened $TARGET_DIR in VS Code — use F1 → 'Reopen in Container'"
+#!/usr/bin/env bash
+set -euo pipefail
+
+TEMPLATE_DIR="$HOME/.devcontainer-default"
+TARGET_DIR="${1:-.}"
+
+# Resolve to absolute path
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
+if [ ! -d "$TEMPLATE_DIR" ]; then
+    echo "Error: Template not found at $TEMPLATE_DIR"
+    echo "Run: cp -r /path/to/.devcontainer ~/.devcontainer-default"
+    exit 1
+fi
+
+if [ -e "$TARGET_DIR/.devcontainer" ]; then
+    echo ".devcontainer already exists in $TARGET_DIR"
+    read -rp "Overwrite with template? [y/N] " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+        rm -rf "$TARGET_DIR/.devcontainer"
+    else
+        echo "Opening as-is..."
+        code "$TARGET_DIR"
+        exit 0
+    fi
+fi
+
+# Copy template (not symlink — Docker build context needs real files)
+cp -r "$TEMPLATE_DIR" "$TARGET_DIR/.devcontainer"
+echo "Copied .devcontainer template into $TARGET_DIR"
+
+# Open in VS Code (user then does F1 → Reopen in Container)
+code "$TARGET_DIR"
+echo "Opened $TARGET_DIR in VS Code — use F1 → 'Reopen in Container'"

@@ -1,0 +1,66 @@
+{
+  "name": "Dev Sandbox",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  // ── RESOURCE LIMITS: Prevent fork bombs / runaway processes ──
+  "runArgs": [
+    "--memory=8g",
+    "--cpus=4",
+    "--pids-limit=1024"
+  ],
+
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false
+    },
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.debugpy",
+        "ms-vscode.cpptools",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "ms-playwright.playwright",
+        "streamlit.streamlit",
+        "ritwickdey.LiveServer"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
+    }
+  },
+  "forwardPorts": [
+    3000, 3001,
+    4173, 4174,
+    5173, 5174,
+    8000, 8080,
+    8501, 8502
+  ],
+  "portsAttributes": {
+    "3000": { "label": "Node/Vite" },
+    "3001": { "label": "Node/Vite Alt" },
+    "4173": { "label": "Vite Preview" },
+    "4174": { "label": "Vite Preview Alt" },
+    "5173": { "label": "Vite Dev" },
+    "5174": { "label": "Vite Dev Alt" },
+    "8000": { "label": "Backend" },
+    "8080": { "label": "HTTP Server" },
+    "8501": { "label": "Streamlit" },
+    "8502": { "label": "Streamlit Alt" }
+  },
+  "postCreateCommand": "/usr/local/bin/container-setup.sh",
+  "remoteUser": "vscode"
+}
