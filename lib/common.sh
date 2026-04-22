@@ -32,21 +32,58 @@ ensure_path() {
     if [[ ":$PATH:" != *":$DA_BIN_DIR:"* ]]; then
         warn "$DA_BIN_DIR is not in your PATH."
 
-        local shell_rc=""
+        local export_line="export PATH=\"$DA_BIN_DIR:\$PATH\""
+        local updated=0
+
+        # Update shell-appropriate startup files only.
+        # macOS defaults to zsh; Linux/WSL often use bash.
+        local rc_candidates=()
         case "${SHELL:-}" in
-            */zsh)  shell_rc="$HOME/.zshrc" ;;
-            */bash) shell_rc="$HOME/.bashrc" ;;
-            *)      shell_rc="$HOME/.profile" ;;
+            */zsh)
+                rc_candidates=("$HOME/.zshrc" "$HOME/.zprofile")
+                ;;
+            */bash)
+                rc_candidates=("$HOME/.bashrc")
+                if [ "$(uname -s 2>/dev/null || true)" = "Darwin" ]; then
+                    rc_candidates+=("$HOME/.bash_profile")
+                fi
+                ;;
+            *)
+                rc_candidates=("$HOME/.profile")
+                ;;
         esac
 
-        local export_line='export PATH="$HOME/.local/bin:$PATH"'
-        if [ -f "$shell_rc" ] && grep -qF "$export_line" "$shell_rc"; then
-            info "PATH export already in $shell_rc — restart your shell."
-        else
-            echo "$export_line" >> "$shell_rc"
-            success "Added PATH export to $shell_rc"
-            info "Restart your shell or run: source $shell_rc"
+        local rc
+        for rc in "${rc_candidates[@]}"; do
+            if [ -f "$rc" ] || [ "$rc" = "$HOME/.bashrc" ] || [ "$rc" = "$HOME/.zshrc" ] || [ "$rc" = "$HOME/.profile" ]; then
+                if ! grep -qF "$export_line" "$rc" 2>/dev/null; then
+                    echo "$export_line" >> "$rc"
+                    success "Added PATH export to $rc"
+                    updated=1
+                fi
+            fi
+        done
+
+        if [ "$updated" -eq 0 ]; then
+            info "PATH export already present in startup files."
         fi
+
+        info "Current shell PATH is unchanged until reload."
+        info "Run now: export PATH=\"$DA_BIN_DIR:\$PATH\""
+    fi
+}
+
+is_windows_shell() {
+    case "$(uname -s 2>/dev/null || true)" in
+        MINGW*|MSYS*|CYGWIN*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+print_platform_notes() {
+    if is_windows_shell; then
+        info "Windows shell detected (Git Bash/MSYS)."
+        info "If VS Code cannot open folders from this shell, run from WSL or open VS Code first."
     fi
 }
 

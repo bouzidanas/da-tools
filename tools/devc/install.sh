@@ -26,5 +26,19 @@ cp -r "$SCRIPT_DIR/templates/devcontainer-default" "$TEMPLATE_DEST"
 success "Installed template → $TEMPLATE_DEST"
 
 ensure_path
+print_platform_notes
+
+FOUND_DEVC="$(command -v devc 2>/dev/null || true)"
+if [ "$FOUND_DEVC" = "$DA_BIN_DIR/devc" ]; then
+	success "devc is available in this shell: $FOUND_DEVC"
+elif [ -n "$FOUND_DEVC" ]; then
+	warn "A different devc is first on PATH: $FOUND_DEVC"
+	info "New install is at: $DA_BIN_DIR/devc"
+	info "Use now: export PATH=\"$DA_BIN_DIR:\$PATH\""
+else
+	warn "devc installed, but not yet in the current shell PATH."
+	info "Use now: export PATH=\"$DA_BIN_DIR:\$PATH\""
+	info "Then verify: command -v devc"
+fi
 
 success "devc installed. Try: ${C_BOLD}devc --help${C_RESET}"

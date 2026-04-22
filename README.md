@@ -32,6 +32,36 @@ curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh
 
 > Executables go to `~/.local/bin`. Data files (templates, etc.) go to `~/.local/share/da-tools/`. The installer adds `~/.local/bin` to your `PATH` if needed.
 
+### macOS
+
+Run in Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc
+```
+
+If `devc` is not found immediately after install, run:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Then open a new terminal tab/window.
+
+### Windows
+
+Recommended: run install in **WSL** (Ubuntu) and use VS Code Remote - WSL.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc
+```
+
+Alternative: use Git Bash. If `devc` is not found right away, run:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
 ## Install from a local checkout
 
 ```bash
