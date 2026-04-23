@@ -52,6 +52,58 @@ DEVC_TEMPLATE=/path/to/my-template devc .
 - Docker (Docker Desktop on Windows/macOS, or Docker Engine on Linux/WSL2)
 - The `code` command available on PATH (VS Code → *Shell Command: Install 'code' command in PATH*)
 
+### macOS requirements
+
+- Homebrew must be installed (`brew`) for this workflow. If `brew` is missing, `devc` now exits with an install hint.
+- Install Homebrew from [brew.sh](https://brew.sh/) before running `devc`.
+
+### Apple Silicon note
+
+- On arm64 builds, the image skips the amd64 Google Chrome package and uses Playwright Chromium during setup. This avoids container build failures on Apple Silicon Macs.
+
+## Project-specific setup notes
+
+This project workflow expects tmux configuration and Trace Extractor certificate setup.
+
+### tmux setup
+
+macOS users should install tmux with Homebrew:
+
+```bash
+brew install tmux
+```
+
+After installing tmux (macOS and Linux), apply the recommended tmux config:
+
+```bash
+echo -e "set-option -g history-limit 100000\nset -g mouse on" > ~/.tmux.conf
+```
+
+If tmux is already running and you want to apply it immediately:
+
+```bash
+echo -e "set-option -g history-limit 100000\nset -g mouse on" > ~/.tmux.conf && tmux source-file ~/.tmux.conf
+```
+
+### Trace Extractor certificate setup
+
+The container setup script installs the certificate into the Linux container trust store.
+
+For host-level trust, run the command for your host OS:
+
+macOS host:
+
+```bash
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.mitmproxy/mitmproxy-ca-cert.pem
+```
+
+Linux/WSL host:
+
+```bash
+sudo cp ~/.mitmproxy/mitmproxy-ca-cert.pem /usr/local/share/ca-certificates/mitmproxy.crt
+sudo update-ca-certificates
+```
+
 ## Uninstall
 
 ```bash

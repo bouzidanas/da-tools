@@ -1,6 +1,7 @@
 FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG TARGETARCH
 
 # Install base development tools, C/C++ toolchain, and browser automation deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -44,12 +45,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     net-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Google Chrome (stable)
-RUN wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends /tmp/chrome.deb \
-    && rm /tmp/chrome.deb \
-    && rm -rf /var/lib/apt/lists/*
+# Install browser runtime:
+# - amd64: Google Chrome stable package
+# - non-amd64 (e.g., Apple Silicon host builds arm64): rely on Playwright Chromium install later
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+        wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+        && apt-get update \
+        && apt-get install -y --no-install-recommends /tmp/chrome.deb \
+        && rm /tmp/chrome.deb \
+        && rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "Skipping Google Chrome apt package on architecture: $TARGETARCH"; \
+    fi
 
 # Set locale
 RUN locale-gen en_US.UTF-8

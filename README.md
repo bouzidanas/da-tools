@@ -40,6 +40,10 @@ Run in Terminal:
 curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc
 ```
 
+`devc` requires Homebrew on macOS for this workflow. If `brew` is not installed, `devc` exits with an install hint. Install Homebrew first from [brew.sh](https://brew.sh/).
+
+For this project's workflow-specific tmux and Trace Extractor certificate steps (including macOS commands), see [tools/devc/README.md](tools/devc/README.md).
+
 If `devc` is not found immediately after install, run:
 
 ```bash
