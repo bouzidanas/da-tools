@@ -11,18 +11,45 @@ curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh
 ## Usage
 
 ```bash
-devc                    # current directory
-devc ~/some/project     # any directory
+devc                    # current directory (interactive)
+devc ~/some/project     # any directory (interactive)
 devc --help
 ```
 
-What it does:
+When launched, `devc` walks you through a small interactive setup:
+
+1. **Trace Extractor download URL** — prefilled with the last-known URL; press <kbd>Enter</kbd> to accept or paste a new one (the link rotates periodically).
+2. **AI CLIs to install in the container** — multi-select checklist of:
+   - Claude Code (Anthropic)
+   - Gemini CLI (Google)
+   - Codex CLI (OpenAI)
+
+   Pick any combination (zero, one, two, or all three).
+
+Key hints are shown at the bottom of every screen:
+`[↑/↓] move   [Space] toggle   [a] all   [n] none   [Enter] confirm   [q] quit`
+
+After you confirm, `devc`:
 
 1. Copies the default `.devcontainer/` template into the target directory
-2. Opens the directory in VS Code
-3. You then run **F1 → Dev Containers: Reopen in Container**
+2. Writes your choices to `.devcontainer/devc.env`
+3. Opens the directory in VS Code
+4. You then run **F1 → Dev Containers: Reopen in Container** — the container's `postCreateCommand` reads `devc.env` and installs only what you selected.
 
 If `.devcontainer/` already exists in the target, you'll be asked whether to overwrite it.
+
+### Non-interactive / scripted use
+
+Set either env var to skip the matching prompt:
+
+```bash
+DEVC_TRACE_URL="https://...zip" \
+DEVC_AI_CLIS="claude,codex" \
+  devc .
+
+# Install no AI CLIs:
+DEVC_AI_CLIS=none devc .
+```
 
 ## What's in the default container
 
@@ -31,7 +58,7 @@ If `.devcontainer/` already exists in the target, you'll be asked whether to ove
 - **Browser automation**: Google Chrome, Playwright (with Chromium), Selenium, webdriver-manager
 - **Python**: streamlit, pytest, fastapi, uvicorn, flask, requests/httpx/aiohttp, beautifulsoup4, openai, anthropic, langchain, etc.
 - **Node**: vite, create-vite, typescript, ts-node, nodemon, live-server
-- **Other**: tmux, git, uv, Claude Code CLI
+- **Other**: tmux, git, uv, plus any AI CLIs you selected (Claude Code, Gemini CLI, Codex CLI)
 - **Forwarded ports**: 3000, 3001, 4173, 4174, 5173, 5174, 8000, 8080, 8501, 8502
 - **Resource limits**: 8GB memory, 4 CPUs, 1024 PID limit
 - **VS Code extensions** auto-installed inside the container: Python, C++, ESLint, Prettier, Tailwind CSS, Playwright, Streamlit, Live Server

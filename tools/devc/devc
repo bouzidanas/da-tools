@@ -14,32 +14,187 @@ if [ ! -d "$TEMPLATE_DIR" ] && [ -d "$HOME/.devcontainer-default" ]; then
     TEMPLATE_DIR="$HOME/.devcontainer-default"
 fi
 
+DEFAULT_TRACE_URL="https://projects-uploaded-files.s3.us-east-2.amazonaws.com/production/item_response_files/_ef924544-553f-48cf-a580-082777d34242_26c4a446-e585-43e0-86c9-830f649a30de.zip"
+
 usage() {
     cat <<EOF
 devc — launch a folder as a VS Code dev container
 
 Usage:
-  devc [DIR]            Copy template into DIR (default: .) and open in VS Code
+  devc [DIR]            Interactively configure, then open DIR (default: .)
   devc -h | --help      Show this help
 
 Environment:
   DEVC_TEMPLATE         Override path to the .devcontainer template directory
+  DEVC_TRACE_URL        Skip the URL prompt and use this value
+  DEVC_AI_CLIS          Skip the AI CLI prompt; comma-separated subset of
+                        claude,gemini,codex (e.g. "claude,codex" or "none")
 EOF
 }
 
+# ── ANSI helpers ────────────────────────────────────────────
+if [ -t 1 ] && [ -t 0 ]; then
+    C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'
+    C_CYAN=$'\033[36m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RED=$'\033[31m'
+    HAS_TTY=1
+else
+    C_RESET=""; C_BOLD=""; C_DIM=""; C_CYAN=""; C_GREEN=""; C_YELLOW=""; C_RED=""
+    HAS_TTY=0
+fi
+
+CURSOR_HIDE=$'\033[?25l'
+CURSOR_SHOW=$'\033[?25h'
+CLEAR_LINE=$'\033[2K\r'
+STTY_SAVE=""
+
+cleanup_tty() {
+    if [ "$HAS_TTY" = "1" ]; then
+        printf "%s" "$CURSOR_SHOW"
+        [ -n "$STTY_SAVE" ] && stty "$STTY_SAVE" 2>/dev/null || true
+    fi
+}
+
+# Read a single keypress, returning a normalized name:
+#   UP, DOWN, LEFT, RIGHT, SPACE, ENTER, ESC, or the literal char
+read_key() {
+    local k rest
+    IFS= read -rsn1 k </dev/tty
+    case "$k" in
+        $'\x1b')
+            IFS= read -rsn2 -t 0.01 rest </dev/tty || rest=""
+            case "$rest" in
+                "[A") echo "UP" ;;
+                "[B") echo "DOWN" ;;
+                "[C") echo "RIGHT" ;;
+                "[D") echo "LEFT" ;;
+                *)    echo "ESC" ;;
+            esac
+            ;;
+        "")    echo "ENTER" ;;
+        $'\n') echo "ENTER" ;;
+        " ")   echo "SPACE" ;;
+        *)     echo "$k" ;;
+    esac
+}
+
+# ── Free-form text prompt with default ──────────────────────
+prompt_text() {
+    # $1 label, $2 default. Echoes value on stdout.
+    local label="$1" default="${2:-}" answer=""
+    if [ "$HAS_TTY" != "1" ]; then
+        echo "$default"; return 0
+    fi
+    {
+        printf "%s▸ %s%s\n" "${C_BOLD}${C_CYAN}" "$label" "$C_RESET"
+        if [ -n "$default" ]; then
+            printf "  %sCurrent default:%s\n    %s\n" "$C_DIM" "$C_RESET" "$default"
+            printf "  %sPress Enter to accept, or paste a new URL:%s\n" "$C_DIM" "$C_RESET"
+        else
+            printf "  %sEnter a value:%s\n" "$C_DIM" "$C_RESET"
+        fi
+        printf "\n%s[Enter] accept   [Ctrl-C] cancel%s\n" "$C_DIM" "$C_RESET"
+        printf "  > "
+    } >/dev/tty
+    IFS= read -r answer </dev/tty || answer=""
+    [ -z "$answer" ] && answer="$default"
+    echo "$answer"
+}
+
+# ── Multi-select checklist ──────────────────────────────────
+# Reads/writes these globals (parallel arrays):
+#   MENU_ITEMS, MENU_KEYS, MENU_DESCS, MENU_SEL ("1"/"0")
+prompt_multiselect() {
+    local title="$1"
+    local n=${#MENU_ITEMS[@]}
+    local cursor=0 key i first=1
+
+    if [ "$HAS_TTY" != "1" ]; then
+        return 0
+    fi
+
+    STTY_SAVE="$(stty -g </dev/tty)"
+    trap cleanup_tty EXIT INT TERM
+    stty -echo -icanon time 0 min 1 </dev/tty
+    printf "%s" "$CURSOR_HIDE" >/dev/tty
+
+    while true; do
+        if [ "$first" = "1" ]; then
+            first=0
+        else
+            # header(1) + items(n) + blank(1) + footer(1) = n+3 lines to rewind
+            printf "\033[%dA" $((n + 3)) >/dev/tty
+        fi
+
+        printf "%s%s▸ %s%s\n" "$CLEAR_LINE" "${C_BOLD}${C_CYAN}" "$title" "$C_RESET" >/dev/tty
+
+        for ((i=0; i<n; i++)); do
+            local mark=" "
+            [ "${MENU_SEL[$i]}" = "1" ] && mark="${C_GREEN}x${C_RESET}"
+            local desc="${MENU_DESCS[$i]:-}"
+            local line="[${mark}] ${MENU_ITEMS[$i]}"
+            [ -n "$desc" ] && line="${line}  ${C_DIM}— ${desc}${C_RESET}"
+            if [ "$i" = "$cursor" ]; then
+                printf "%s%s❯%s %s\n" "$CLEAR_LINE" "$C_CYAN" "$C_RESET" "$line" >/dev/tty
+            else
+                printf "%s  %s\n" "$CLEAR_LINE" "$line" >/dev/tty
+            fi
+        done
+
+        printf "%s\n" "$CLEAR_LINE" >/dev/tty
+        printf "%s%s[↑/↓] move   [Space] toggle   [a] all   [n] none   [Enter] confirm   [q] quit%s\n" \
+            "$CLEAR_LINE" "$C_DIM" "$C_RESET" >/dev/tty
+
+        key="$(read_key)"
+        case "$key" in
+            UP|k)   cursor=$(( (cursor - 1 + n) % n )) ;;
+            DOWN|j) cursor=$(( (cursor + 1) % n )) ;;
+            SPACE|x)
+                if [ "${MENU_SEL[$cursor]}" = "1" ]; then
+                    MENU_SEL[$cursor]=0
+                else
+                    MENU_SEL[$cursor]=1
+                fi
+                ;;
+            a|A) for ((i=0; i<n; i++)); do MENU_SEL[$i]=1; done ;;
+            n|N) for ((i=0; i<n; i++)); do MENU_SEL[$i]=0; done ;;
+            ENTER) break ;;
+            q|Q|ESC)
+                cleanup_tty
+                trap - EXIT INT TERM
+                printf "\nCancelled.\n" >&2
+                exit 130
+                ;;
+        esac
+    done
+
+    cleanup_tty
+    trap - EXIT INT TERM
+}
+
+# ── Argument parsing ────────────────────────────────────────
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+esac
+
+TARGET_DIR="${1:-.}"
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "Error: directory not found: $TARGET_DIR" >&2
+    exit 1
+fi
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
+# ── Preflight ───────────────────────────────────────────────
 preflight_checks() {
     if ! command -v code >/dev/null 2>&1; then
         echo "Error: VS Code CLI 'code' is not available on PATH." >&2
         echo "In VS Code, run: Shell Command: Install 'code' command in PATH" >&2
         exit 1
     fi
-
     if ! command -v docker >/dev/null 2>&1; then
         echo "Error: Docker CLI is not installed or not on PATH." >&2
         echo "Install Docker Desktop (macOS/Windows) or Docker Engine (Linux/WSL)." >&2
         exit 1
     fi
-
     if ! docker info >/dev/null 2>&1; then
         echo "Error: Docker is installed but not running or not reachable." >&2
         echo "Start Docker Desktop / Docker daemon, then retry." >&2
@@ -47,19 +202,11 @@ preflight_checks() {
     fi
 }
 
-case "${1:-}" in
-    -h|--help) usage; exit 0 ;;
-esac
-
-# macOS prerequisite for this project's workflow.
 if [ "$(uname -s 2>/dev/null || true)" = "Darwin" ] && ! command -v brew >/dev/null 2>&1; then
     echo "Error: Homebrew is required on macOS to create devc containers for this workflow." >&2
     echo "Install Homebrew first: https://brew.sh/" >&2
     exit 1
 fi
-
-TARGET_DIR="${1:-.}"
-TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 
 if [ ! -d "$TEMPLATE_DIR" ]; then
     echo "Error: template not found at $TEMPLATE_DIR" >&2
@@ -69,9 +216,69 @@ fi
 
 preflight_checks
 
+# ── Banner ──────────────────────────────────────────────────
+printf "\n%sdevc — configure dev container%s\n" "$C_BOLD" "$C_RESET"
+printf "%sTarget:%s %s\n\n" "$C_DIM" "$C_RESET" "$TARGET_DIR"
+
+# ── Step 1: Trace Extractor URL ─────────────────────────────
+if [ -n "${DEVC_TRACE_URL:-}" ]; then
+    TRACE_URL="$DEVC_TRACE_URL"
+    printf "%susing DEVC_TRACE_URL from environment%s\n" "$C_DIM" "$C_RESET"
+else
+    TRACE_URL="$(prompt_text "Trace Extractor download URL" "$DEFAULT_TRACE_URL")"
+fi
+echo
+
+# ── Step 2: AI CLIs ─────────────────────────────────────────
+declare -a MENU_ITEMS=("Claude Code" "Gemini CLI" "Codex CLI")
+declare -a MENU_KEYS=("claude" "gemini" "codex")
+declare -a MENU_DESCS=(
+    "Anthropic — install.sh from claude.ai"
+    "Google — npm i -g @google/gemini-cli"
+    "OpenAI — npm i -g @openai/codex"
+)
+declare -a MENU_SEL=(1 0 0)
+
+if [ -n "${DEVC_AI_CLIS:-}" ]; then
+    for i in 0 1 2; do MENU_SEL[$i]=0; done
+    if [ "$DEVC_AI_CLIS" != "none" ]; then
+        IFS=',' read -ra _picks <<< "$DEVC_AI_CLIS"
+        for p in "${_picks[@]}"; do
+            p="${p// /}"
+            for i in 0 1 2; do
+                if [ "${MENU_KEYS[$i]}" = "$p" ]; then MENU_SEL[$i]=1; fi
+            done
+        done
+    fi
+    printf "%susing DEVC_AI_CLIS from environment%s\n" "$C_DIM" "$C_RESET"
+else
+    prompt_multiselect "Which AI CLIs should be installed in the container?"
+fi
+
+SELECTED_CLIS=""
+for i in 0 1 2; do
+    if [ "${MENU_SEL[$i]}" = "1" ]; then
+        if [ -z "$SELECTED_CLIS" ]; then
+            SELECTED_CLIS="${MENU_KEYS[$i]}"
+        else
+            SELECTED_CLIS="${SELECTED_CLIS},${MENU_KEYS[$i]}"
+        fi
+    fi
+done
+
+# ── Summary ─────────────────────────────────────────────────
+echo
+printf "%sSummary%s\n" "$C_BOLD" "$C_RESET"
+printf "  %sTarget dir:%s   %s\n" "$C_DIM" "$C_RESET" "$TARGET_DIR"
+printf "  %sTrace URL:%s    %s\n" "$C_DIM" "$C_RESET" "$TRACE_URL"
+printf "  %sAI CLIs:%s      %s\n" "$C_DIM" "$C_RESET" "${SELECTED_CLIS:-<none>}"
+echo
+
+# ── Copy template ───────────────────────────────────────────
 if [ -e "$TARGET_DIR/.devcontainer" ]; then
-    echo ".devcontainer already exists in $TARGET_DIR"
-    read -rp "Overwrite with template? [y/N] " answer
+    printf "%s.devcontainer already exists in %s%s\n" "$C_YELLOW" "$TARGET_DIR" "$C_RESET"
+    printf "Overwrite with template? [y/N] "
+    IFS= read -r answer </dev/tty || answer=""
     if [[ "$answer" =~ ^[Yy]$ ]]; then
         rm -rf "$TARGET_DIR/.devcontainer"
     else
@@ -82,7 +289,17 @@ if [ -e "$TARGET_DIR/.devcontainer" ]; then
 fi
 
 cp -r "$TEMPLATE_DIR" "$TARGET_DIR/.devcontainer"
-echo "Copied .devcontainer template into $TARGET_DIR"
+
+# Bake user choices into .devcontainer/devc.env so setup.sh inside the
+# container can read them at postCreateCommand time.
+ENV_FILE="$TARGET_DIR/.devcontainer/devc.env"
+{
+    echo "# Generated by devc on $(date -u +%FT%TZ)"
+    echo "DEVC_TRACE_URL=\"$TRACE_URL\""
+    echo "DEVC_AI_CLIS=\"$SELECTED_CLIS\""
+} > "$ENV_FILE"
+
+printf "%s✓%s Wrote .devcontainer template + devc.env to %s\n" "$C_GREEN" "$C_RESET" "$TARGET_DIR"
 
 code "$TARGET_DIR"
-echo "Opened $TARGET_DIR in VS Code — use F1 → 'Reopen in Container'"
+printf "%s✓%s Opened %s in VS Code — use F1 → 'Reopen in Container'\n" "$C_GREEN" "$C_RESET" "$TARGET_DIR"

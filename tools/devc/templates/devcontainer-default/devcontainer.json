@@ -61,6 +61,6 @@
     "8501": { "label": "Streamlit" },
     "8502": { "label": "Streamlit Alt" }
   },
-  "postCreateCommand": "/usr/local/bin/container-setup.sh",
+  "postCreateCommand": "set -a; [ -f ${containerWorkspaceFolder}/.devcontainer/devc.env ] && . ${containerWorkspaceFolder}/.devcontainer/devc.env; set +a; /usr/local/bin/container-setup.sh",
   "remoteUser": "vscode"
 }

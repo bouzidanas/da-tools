@@ -20,6 +20,19 @@ echo "========================================"
 echo "  Dev Container Setup"
 echo "========================================"
 
+# ── User choices (set by devc, with fallbacks) ─────────────
+DEVC_AI_CLIS="${DEVC_AI_CLIS:-claude}"
+DEVC_TRACE_URL="${DEVC_TRACE_URL:-https://projects-uploaded-files.s3.us-east-2.amazonaws.com/production/item_response_files/_ef924544-553f-48cf-a580-082777d34242_26c4a446-e585-43e0-86c9-830f649a30de.zip}"
+
+want_cli() {
+    case ",${DEVC_AI_CLIS}," in
+        *",$1,"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+echo "  AI CLIs to install: ${DEVC_AI_CLIS:-<none>}"
+echo "  Trace Extractor URL: ${DEVC_TRACE_URL}"
+
 # ── System tools (tmux, git) ────────────────────────────────
 echo ""
 echo "[1/9] Installing system tools (tmux, git)..."
@@ -51,12 +64,25 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Add uv to PATH for this script
 export PATH="$HOME/.local/bin:$PATH"
 
-# ── Claude Code CLI ─────────────────────────────────────────
+# ── AI CLIs (user-selected) ─────────────────────────────────
 echo ""
-echo "[3/9] Installing Claude Code..."
-curl -fsSL https://claude.ai/install.sh | bash
-# Add claude to PATH for this script
-export PATH="$HOME/.claude/bin:$PATH"
+echo "[3/9] Installing AI CLIs (${DEVC_AI_CLIS:-none})..."
+if want_cli claude; then
+    echo "  • Claude Code"
+    curl -fsSL https://claude.ai/install.sh | bash
+    export PATH="$HOME/.claude/bin:$PATH"
+fi
+if want_cli gemini; then
+    echo "  • Gemini CLI"
+    npm install -g @google/gemini-cli
+fi
+if want_cli codex; then
+    echo "  • Codex CLI"
+    npm install -g @openai/codex
+fi
+if [ -z "${DEVC_AI_CLIS}" ]; then
+    echo "  (no AI CLIs selected)"
+fi
 
 # ── Python packages ──────────────────────────────────────────
 echo ""
@@ -118,9 +144,10 @@ npm install -g \
 
 # ── Claude Code settings ────────────────────────────────────
 echo ""
-echo "[8/9] Creating Claude Code settings..."
-mkdir -p ~/.claude
-python - << 'PY'
+echo "[8/9] Configuring Claude Code settings..."
+if want_cli claude; then
+    mkdir -p ~/.claude
+    python - << 'PY'
 import json
 from pathlib import Path
 
@@ -136,11 +163,14 @@ data["showThinkingSummaries"] = True
 settings_path.write_text(json.dumps(data, indent=4) + "\n")
 print(f"  Updated {settings_path} with showThinkingSummaries=true")
 PY
+else
+    echo "  Skipped (Claude Code not selected)."
+fi
 
 # ── Trace Extractor ─────────────────────────────────────────
 echo ""
 echo "[9/9] Installing Trace Extractor..."
-TRACE_ZIP_URL="https://projects-uploaded-files.s3.us-east-2.amazonaws.com/production/item_response_files/_ef924544-553f-48cf-a580-082777d34242_26c4a446-e585-43e0-86c9-830f649a30de.zip"
+TRACE_ZIP_URL="$DEVC_TRACE_URL"
 TRACE_ZIP="/tmp/trace-extractor.zip"
 
 if [ ! -d "$HOME/cli-trace-extractor" ]; then
@@ -197,7 +227,9 @@ echo "  - Node:   $(node --version)"
 echo "  - npm:    $(npm --version)"
 echo "  - tmux:   $(tmux -V)"
 echo "  - uv:     $(uv --version 2>/dev/null || echo 'N/A')"
-echo "  - claude: $(claude --version 2>/dev/null || echo 'N/A')"
+want_cli claude && echo "  - claude: $(claude --version 2>/dev/null || echo 'N/A')"
+want_cli gemini && echo "  - gemini: $(gemini --version 2>/dev/null || echo 'N/A')"
+want_cli codex  && echo "  - codex:  $(codex --version 2>/dev/null || echo 'N/A')"
 echo "  - git:    $(git --version)"
 echo "  - Chrome: $CHROME_VERSION"
 echo "========================================"
