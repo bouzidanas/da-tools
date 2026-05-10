@@ -14,7 +14,16 @@ if [ ! -d "$TEMPLATE_DIR" ] && [ -d "$HOME/.devcontainer-default" ]; then
     TEMPLATE_DIR="$HOME/.devcontainer-default"
 fi
 
+
+# Persist last used Trace Extractor URL
+DEVC_TRACE_URL_FILE="$HOME/.devc_last_trace_url"
 DEFAULT_TRACE_URL="https://projects-uploaded-files.s3.us-east-2.amazonaws.com/production/item_response_files/_ef924544-553f-48cf-a580-082777d34242_26c4a446-e585-43e0-86c9-830f649a30de.zip"
+if [ -f "$DEVC_TRACE_URL_FILE" ]; then
+    LAST_TRACE_URL="$(cat "$DEVC_TRACE_URL_FILE" | head -n1)"
+    if [ -n "$LAST_TRACE_URL" ]; then
+        DEFAULT_TRACE_URL="$LAST_TRACE_URL"
+    fi
+fi
 
 usage() {
     cat <<EOF
@@ -252,9 +261,17 @@ if [ -n "${DEVC_TRACE_URL:-}" ]; then
 
 else
     TRACE_URL="$(prompt_text "Trace Extractor download URL" "$DEFAULT_TRACE_URL")"
-    # Flush any extra input (e.g., trailing newlines from paste) before next prompt
+    # Save the new URL for next time if changed
+    if [ -n "$TRACE_URL" ] && [ "$TRACE_URL" != "$DEFAULT_TRACE_URL" ]; then
+        echo "$TRACE_URL" > "$DEVC_TRACE_URL_FILE"
+    fi
+    # Robustly flush any extra input (e.g., trailing newlines from paste) before next prompt
     # Works on both WSL2 and macOS
-    while IFS= read -r -t 0.01 -n 100 dummy </dev/tty 2>/dev/null; do :; done
+    if [ "$HAS_TTY" = "1" ]; then
+        while true; do
+            IFS= read -r -t 0.1 -n 100 dummy </dev/tty 2>/dev/null || break
+        done
+    fi
 fi
 echo
 
