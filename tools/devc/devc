@@ -391,11 +391,78 @@ if [ "$SUPABASE_FLAG" = "1" ]; then
     else
         echo "Supabase project already initialized in $TARGET_DIR/supabase"
     fi
+
+    # ── Pick free ports (defaults shifted by +100 to avoid common conflicts) ──
+    # Supabase default ports: api=54321, db=54322, shadow=54320, studio=54323,
+    # inbucket=54324, analytics=54327, pooler=54329.
+    SUPABASE_CONFIG="$TARGET_DIR/supabase/config.toml"
+    is_port_free() {
+        # returns 0 if free, 1 if in use
+        if command -v lsof >/dev/null 2>&1; then
+            ! lsof -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
+        elif command -v nc >/dev/null 2>&1; then
+            ! nc -z localhost "$1" >/dev/null 2>&1
+        else
+            return 0
+        fi
+    }
+    pick_free_port() {
+        # $1 = starting port; finds first free port >= start
+        local p="$1"
+        while ! is_port_free "$p"; do
+            p=$((p + 1))
+        done
+        echo "$p"
+    }
+
+    if [ -f "$SUPABASE_CONFIG" ]; then
+        SB_API_PORT="$(pick_free_port 54421)"
+        SB_DB_PORT="$(pick_free_port 54422)"
+        SB_SHADOW_PORT="$(pick_free_port 54420)"
+        SB_STUDIO_PORT="$(pick_free_port 54423)"
+        SB_INBUCKET_PORT="$(pick_free_port 54424)"
+        SB_ANALYTICS_PORT="$(pick_free_port 54427)"
+        SB_POOLER_PORT="$(pick_free_port 54429)"
+
+        printf "%sRewriting Supabase ports to avoid conflicts:%s\n" "$C_DIM" "$C_RESET"
+        printf "  api=%s db=%s studio=%s shadow=%s inbucket=%s analytics=%s pooler=%s\n" \
+            "$SB_API_PORT" "$SB_DB_PORT" "$SB_STUDIO_PORT" "$SB_SHADOW_PORT" \
+            "$SB_INBUCKET_PORT" "$SB_ANALYTICS_PORT" "$SB_POOLER_PORT"
+
+        # Portable in-place sed (BSD/macOS + GNU)
+        sed_inplace() {
+            if sed --version >/dev/null 2>&1; then
+                sed -i "$@"
+            else
+                sed -i '' "$@"
+            fi
+        }
+        # Replace first `port = <old>` occurrence under each section.
+        # Supabase's generated config has at most one `port = N` per section,
+        # so simple value-based substitutions are safe.
+        sed_inplace -e "s/^port = 54321\$/port = ${SB_API_PORT}/" \
+                    -e "s/^port = 54322\$/port = ${SB_DB_PORT}/" \
+                    -e "s/^shadow_port = 54320\$/shadow_port = ${SB_SHADOW_PORT}/" \
+                    -e "s/^port = 54323\$/port = ${SB_STUDIO_PORT}/" \
+                    -e "s/^port = 54324\$/port = ${SB_INBUCKET_PORT}/" \
+                    -e "s/^port = 54327\$/port = ${SB_ANALYTICS_PORT}/" \
+                    -e "s/^port = 54329\$/port = ${SB_POOLER_PORT}/" \
+                    "$SUPABASE_CONFIG"
+    else
+        echo "Warning: $SUPABASE_CONFIG not found; using Supabase default ports."
+        SB_API_PORT=54321
+        SB_DB_PORT=54322
+        SB_STUDIO_PORT=54323
+    fi
+
     # Start Supabase local stack
     (cd "$TARGET_DIR" && supabase start)
     echo
-    echo "Supabase local stack started. Access it at http://localhost:54321"
-    echo "You can connect your app using the local anon/public keys in $TARGET_DIR/supabase/.env or $TARGET_DIR/supabase/config.toml."
+    echo "Supabase local stack started."
+    echo "  API:    http://localhost:${SB_API_PORT}"
+    echo "  DB:     postgresql://postgres:postgres@localhost:${SB_DB_PORT}/postgres"
+    echo "  Studio: http://localhost:${SB_STUDIO_PORT}"
+    echo "Anon/service keys are printed above by 'supabase start' (also see $TARGET_DIR/supabase/config.toml)."
     echo "To stop Supabase, run: supabase stop (in your project directory)"
 fi
 
