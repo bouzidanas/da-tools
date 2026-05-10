@@ -191,9 +191,26 @@ prompt_multiselect() {
 }
 
 # ── Argument parsing ────────────────────────────────────────
-case "${1:-}" in
-    -h|--help) usage; exit 0 ;;
-esac
+
+# ── Argument parsing with --supabase flag ─────────────
+SUPABASE_FLAG=0
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -h|--help)
+            usage; exit 0 ;;
+        -s|--supabase)
+            SUPABASE_FLAG=1
+            shift # past flag
+            ;;
+        *)
+            POSITIONAL+=("$1")
+            shift # past argument
+            ;;
+    esac
+done
+set -- "${POSITIONAL[@]}"
 
 # Detect non-interactive mode and adjust behavior
 if [ ! -t 0 ] || [ ! -t 1 ]; then
@@ -334,6 +351,7 @@ if [ -e "$TARGET_DIR/.devcontainer" ]; then
     fi
 fi
 
+
 cp -r "$TEMPLATE_DIR" "$TARGET_DIR/.devcontainer"
 
 # Bake user choices into .devcontainer/devc.env so setup.sh inside the
@@ -345,7 +363,41 @@ ENV_FILE="$TARGET_DIR/.devcontainer/devc.env"
     echo "DEVC_AI_CLIS=\"$SELECTED_CLIS\""
 } > "$ENV_FILE"
 
+
 printf "%s✓%s Wrote .devcontainer template + devc.env to %s\n" "$C_GREEN" "$C_RESET" "$TARGET_DIR"
+
+# ── Supabase local setup if requested ─────────────
+if [ "$SUPABASE_FLAG" = "1" ]; then
+    echo
+    printf "%sSupabase local setup requested (--supabase)%s\n" "$C_BOLD" "$C_RESET"
+    # Check Docker
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "Error: Docker is required for Supabase local. Please install Docker Desktop." >&2
+        exit 1
+    fi
+    # Check Supabase CLI
+    if ! command -v supabase >/dev/null 2>&1; then
+        echo "Supabase CLI not found. Installing globally with npm..."
+        if command -v npm >/dev/null 2>&1; then
+            npm install -g supabase || { echo "Failed to install supabase CLI." >&2; exit 1; }
+        else
+            echo "npm is required to install supabase CLI. Please install Node.js and npm." >&2
+            exit 1
+        fi
+    fi
+    # Init Supabase project if not already
+    if [ ! -d "$TARGET_DIR/supabase" ]; then
+        (cd "$TARGET_DIR" && supabase init)
+    else
+        echo "Supabase project already initialized in $TARGET_DIR/supabase"
+    fi
+    # Start Supabase local stack
+    (cd "$TARGET_DIR" && supabase start)
+    echo
+    echo "Supabase local stack started. Access it at http://localhost:54321"
+    echo "You can connect your app using the local anon/public keys in $TARGET_DIR/supabase/.env or $TARGET_DIR/supabase/config.toml."
+    echo "To stop Supabase, run: supabase stop (in your project directory)"
+fi
 
 code "$TARGET_DIR"
 printf "%s✓%s Opened %s in VS Code — use F1 → 'Reopen in Container'\n" "$C_GREEN" "$C_RESET" "$TARGET_DIR"
