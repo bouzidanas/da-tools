@@ -392,9 +392,10 @@ if [ "$SUPABASE_FLAG" = "1" ]; then
         echo "Supabase project already initialized in $TARGET_DIR/supabase"
     fi
 
-    # ── Pick free ports (defaults shifted by +100 to avoid common conflicts) ──
-    # Supabase default ports: api=54321, db=54322, shadow=54320, studio=54323,
-    # inbucket=54324, analytics=54327, pooler=54329.
+    # ── Pick a free contiguous block of 10 ports for Supabase ──
+    # Supabase reserves the range 54320-54329 by default. We allocate a fresh
+    # 10-port block (54420, 54430, 54450, …) where ALL ports are free, so
+    # multiple devc projects with --supabase don't collide on the host.
     SUPABASE_CONFIG="$TARGET_DIR/supabase/config.toml"
     is_port_free() {
         # returns 0 if free, 1 if in use
@@ -406,48 +407,55 @@ if [ "$SUPABASE_FLAG" = "1" ]; then
             return 0
         fi
     }
-    pick_free_port() {
-        # $1 = starting port; finds first free port >= start
-        local p="$1"
-        while ! is_port_free "$p"; do
-            p=$((p + 1))
+    pick_free_block() {
+        # $1 = starting base (e.g. 54420), $2 = block size (e.g. 10)
+        local base="$1" size="$2" i ok
+        while :; do
+            ok=1
+            for ((i=0; i<size; i++)); do
+                if ! is_port_free $((base + i)); then
+                    ok=0; break
+                fi
+            done
+            if [ "$ok" = "1" ]; then
+                echo "$base"; return 0
+            fi
+            base=$((base + size))
+            if [ "$base" -gt 60000 ]; then
+                echo "ERROR: could not find a free 10-port block above 54420." >&2
+                return 1
+            fi
         done
-        echo "$p"
     }
 
     if [ -f "$SUPABASE_CONFIG" ]; then
-        SB_API_PORT="$(pick_free_port 54421)"
-        SB_DB_PORT="$(pick_free_port 54422)"
-        SB_SHADOW_PORT="$(pick_free_port 54420)"
-        SB_STUDIO_PORT="$(pick_free_port 54423)"
-        SB_INBUCKET_PORT="$(pick_free_port 54424)"
-        SB_ANALYTICS_PORT="$(pick_free_port 54427)"
-        SB_POOLER_PORT="$(pick_free_port 54429)"
+        SB_BASE="$(pick_free_block 54420 10)" || exit 1
+        SB_OFFSET=$((SB_BASE - 54320))
+        printf "%sAllocating Supabase port block:%s 543%02d-543%02d → %d-%d\n" \
+            "$C_DIM" "$C_RESET" 20 29 "$SB_BASE" "$((SB_BASE + 9))"
 
-        printf "%sRewriting Supabase ports to avoid conflicts:%s\n" "$C_DIM" "$C_RESET"
-        printf "  api=%s db=%s studio=%s shadow=%s inbucket=%s analytics=%s pooler=%s\n" \
-            "$SB_API_PORT" "$SB_DB_PORT" "$SB_STUDIO_PORT" "$SB_SHADOW_PORT" \
-            "$SB_INBUCKET_PORT" "$SB_ANALYTICS_PORT" "$SB_POOLER_PORT"
+        # Rewrite every `port = 543NN`, `shadow_port = 543NN`, `smtp_port = 543NN`,
+        # `pop3_port = 543NN` line in the config by adding SB_OFFSET. Uses awk so
+        # we don't have to enumerate every individual service. Portable: works
+        # with both BSD awk (macOS) and gawk (Linux).
+        awk -v off="$SB_OFFSET" '
+            /^[[:space:]]*(port|shadow_port|smtp_port|pop3_port)[[:space:]]*=[[:space:]]*543[0-9][0-9][[:space:]]*$/ {
+                n = split($0, parts, "=")
+                key = parts[1]
+                val = parts[2]
+                # strip surrounding whitespace from val
+                sub(/^[[:space:]]+/, "", val)
+                sub(/[[:space:]]+$/, "", val)
+                printf "%s= %d\n", key, val + off
+                next
+            }
+            { print }
+        ' "$SUPABASE_CONFIG" > "$SUPABASE_CONFIG.tmp" && mv "$SUPABASE_CONFIG.tmp" "$SUPABASE_CONFIG"
 
-        # Portable in-place sed (BSD/macOS + GNU)
-        sed_inplace() {
-            if sed --version >/dev/null 2>&1; then
-                sed -i "$@"
-            else
-                sed -i '' "$@"
-            fi
-        }
-        # Replace first `port = <old>` occurrence under each section.
-        # Supabase's generated config has at most one `port = N` per section,
-        # so simple value-based substitutions are safe.
-        sed_inplace -e "s/^port = 54321\$/port = ${SB_API_PORT}/" \
-                    -e "s/^port = 54322\$/port = ${SB_DB_PORT}/" \
-                    -e "s/^shadow_port = 54320\$/shadow_port = ${SB_SHADOW_PORT}/" \
-                    -e "s/^port = 54323\$/port = ${SB_STUDIO_PORT}/" \
-                    -e "s/^port = 54324\$/port = ${SB_INBUCKET_PORT}/" \
-                    -e "s/^port = 54327\$/port = ${SB_ANALYTICS_PORT}/" \
-                    -e "s/^port = 54329\$/port = ${SB_POOLER_PORT}/" \
-                    "$SUPABASE_CONFIG"
+        # Capture the ones we care about for the post-start summary.
+        SB_API_PORT=$((54321 + SB_OFFSET))
+        SB_DB_PORT=$((54322 + SB_OFFSET))
+        SB_STUDIO_PORT=$((54323 + SB_OFFSET))
     else
         echo "Warning: $SUPABASE_CONFIG not found; using Supabase default ports."
         SB_API_PORT=54321
