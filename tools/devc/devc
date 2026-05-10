@@ -67,13 +67,20 @@ cleanup_tty() {
 #   UP, DOWN, LEFT, RIGHT, SPACE, ENTER, ESC, or the literal char
 read_key() {
     local k rest
-    if ! IFS= read -rsn1 -t 0.1 k </dev/tty 2>/dev/null; then
+    # Block until a key is pressed. Do NOT use a timeout here — a timeout
+    # would cause the multi-select to auto-confirm with the default selection
+    # the moment it opens (no key pending → timeout → treated as ENTER),
+    # which is exactly the "second prompt is skipped" symptom after pasting
+    # a URL into the previous prompt.
+    if ! IFS= read -rsn1 k </dev/tty 2>/dev/null; then
         echo "ENTER"
         return 0
     fi
     case "$k" in
         $'\x1b')
-            IFS= read -rsn2 -t 0.01 rest </dev/tty 2>/dev/null || rest=""
+            # Short timeout here is correct: distinguishes a bare ESC from
+            # an arrow-key escape sequence (ESC [ A/B/C/D).
+            IFS= read -rsn2 -t 0.05 rest </dev/tty 2>/dev/null || rest=""
             case "$rest" in
                 "[A") echo "UP" ;;
                 "[B") echo "DOWN" ;;
@@ -263,14 +270,7 @@ else
     TRACE_URL="$(prompt_text "Trace Extractor download URL" "$DEFAULT_TRACE_URL")"
     # Save the new URL for next time if changed
     if [ -n "$TRACE_URL" ] && [ "$TRACE_URL" != "$DEFAULT_TRACE_URL" ]; then
-        echo "$TRACE_URL" > "$DEVC_TRACE_URL_FILE"
-    fi
-    # Robustly flush any extra input (e.g., trailing newlines from paste) before next prompt
-    # Works on both WSL2 and macOS
-    if [ "$HAS_TTY" = "1" ]; then
-        while true; do
-            IFS= read -r -t 0.1 -n 100 dummy </dev/tty 2>/dev/null || break
-        done
+        printf "%s\n" "$TRACE_URL" > "$DEVC_TRACE_URL_FILE"
     fi
 fi
 echo
