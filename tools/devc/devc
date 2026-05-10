@@ -58,10 +58,13 @@ cleanup_tty() {
 #   UP, DOWN, LEFT, RIGHT, SPACE, ENTER, ESC, or the literal char
 read_key() {
     local k rest
-    IFS= read -rsn1 k </dev/tty
+    if ! IFS= read -rsn1 -t 0.1 k </dev/tty 2>/dev/null; then
+        echo "ENTER"
+        return 0
+    fi
     case "$k" in
         $'\x1b')
-            IFS= read -rsn2 -t 0.01 rest </dev/tty || rest=""
+            IFS= read -rsn2 -t 0.01 rest </dev/tty 2>/dev/null || rest=""
             case "$rest" in
                 "[A") echo "UP" ;;
                 "[B") echo "DOWN" ;;
@@ -94,8 +97,8 @@ prompt_text() {
         fi
         printf "\n%s[Enter] accept   [Ctrl-C] cancel%s\n" "$C_DIM" "$C_RESET"
         printf "  > "
-    } >/dev/tty
-    IFS= read -r answer </dev/tty || answer=""
+    } >/dev/tty 2>/dev/null || true
+    IFS= read -r answer </dev/tty 2>/dev/null || answer=""
     [ -z "$answer" ] && answer="$default"
     echo "$answer"
 }
@@ -176,12 +179,22 @@ case "${1:-}" in
     -h|--help) usage; exit 0 ;;
 esac
 
+# Detect non-interactive mode and adjust behavior
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+    HAS_TTY=0
+fi
+
 TARGET_DIR="${1:-.}"
 if [ ! -d "$TARGET_DIR" ]; then
     echo "Error: directory not found: $TARGET_DIR" >&2
     exit 1
 fi
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
+# ── WSL2 detection ─────────────────────────────────────────
+is_wsl2() {
+    [ "$(uname -r | grep -i microsoft)" ] && return 0 || return 1
+}
 
 # ── Preflight ───────────────────────────────────────────────
 preflight_checks() {
@@ -192,12 +205,24 @@ preflight_checks() {
     fi
     if ! command -v docker >/dev/null 2>&1; then
         echo "Error: Docker CLI is not installed or not on PATH." >&2
-        echo "Install Docker Desktop (macOS/Windows) or Docker Engine (Linux/WSL)." >&2
+        if is_wsl2; then
+            echo "On Windows+WSL2: Install Docker Desktop, then configure it for WSL2 integration." >&2
+        else
+            echo "Install Docker Desktop (macOS/Windows) or Docker Engine (Linux/WSL)." >&2
+        fi
         exit 1
     fi
     if ! docker info >/dev/null 2>&1; then
         echo "Error: Docker is installed but not running or not reachable." >&2
-        echo "Start Docker Desktop / Docker daemon, then retry." >&2
+        if is_wsl2; then
+            echo "WSL2 checklist:" >&2
+            echo "  1. Ensure Docker Desktop is running on Windows host." >&2
+            echo "  2. Check Docker Desktop settings > Resources > WSL integration is enabled." >&2
+            echo "  3. Verify: docker context ls" >&2
+            echo "  4. If using custom socket, set: export DOCKER_HOST=unix:///mnt/wsl/shared-docker/docker.sock" >&2
+        else
+            echo "Start Docker Desktop / Docker daemon, then retry." >&2
+        fi
         exit 1
     fi
 }

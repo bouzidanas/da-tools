@@ -131,6 +131,42 @@ sudo cp ~/.mitmproxy/mitmproxy-ca-cert.pem /usr/local/share/ca-certificates/mitm
 sudo update-ca-certificates
 ```
 
+## Windows / WSL2 setup
+
+If running `devc` in WSL2 and Docker fails:
+
+### Docker Desktop WSL2 integration
+
+1. Ensure Docker Desktop is running on Windows.
+2. Open Docker Desktop **Settings** > **Resources** > **WSL integration**.
+3. Toggle **Enable integration with my default WSL distro** (or select your distro).
+4. Verify from WSL2 terminal:
+   ```bash
+   docker info
+   ```
+
+### Firewall issues
+
+If `docker info` fails on WSL2, check Windows firewall:
+
+1. Windows Defender Firewall > Allow an app through firewall
+2. Ensure **Docker Desktop** is allowed for both Private and Public networks.
+
+### Docker socket troubleshooting
+
+If you get permission errors with `/var/run/docker.sock`:
+
+```bash
+# Check if you're in the docker group:
+groups
+
+# If not, add your user (in WSL2):
+sudo usermod -aG docker $USER
+
+# Log out and log back in (or restart WSL2):
+exec newgrp docker
+```
+
 ## Uninstall
 
 ```bash

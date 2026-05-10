@@ -171,13 +171,22 @@ fi
 echo ""
 echo "[9/9] Installing Trace Extractor..."
 TRACE_ZIP_URL="$DEVC_TRACE_URL"
-TRACE_ZIP="/tmp/trace-extractor.zip"
+# Use a safer temp location that works on all systems (including WSL2 with slow /tmp)
+TRACE_ZIP="${XDG_CACHE_HOME:-$HOME/.cache}/trace-extractor-$(date +%s).zip"
+mkdir -p "$(dirname "$TRACE_ZIP")"
 
 if [ ! -d "$HOME/cli-trace-extractor" ]; then
-    curl -fsSL -o "$TRACE_ZIP" "$TRACE_ZIP_URL"
-    unzip -o "$TRACE_ZIP" -d "$HOME/"
-    rm -f "$TRACE_ZIP"
-    echo "  Extracted cli-trace-extractor to ~/cli-trace-extractor"
+    if curl -fsSL -o "$TRACE_ZIP" "$TRACE_ZIP_URL"; then
+        if unzip -o "$TRACE_ZIP" -d "$HOME/" 2>/dev/null; then
+            rm -f "$TRACE_ZIP"
+            echo "  Extracted cli-trace-extractor to ~/cli-trace-extractor"
+        else
+            echo "  WARNING: Failed to extract trace extractor zip. Continuing..."
+            rm -f "$TRACE_ZIP"
+        fi
+    else
+        echo "  WARNING: Failed to download trace extractor. Continuing..."
+    fi
 else
     echo "  ~/cli-trace-extractor already exists, skipping download."
 fi

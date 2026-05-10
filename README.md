@@ -52,19 +52,30 @@ export PATH="$HOME/.local/bin:$PATH"
 
 Then open a new terminal tab/window.
 
-### Windows
+### Windows (WSL2 recommended)
 
-Recommended: run install in **WSL** (Ubuntu) and use VS Code Remote - WSL.
+**Recommended: WSL2 + Ubuntu**
+
+WSL2 provides a full Linux environment with native Docker support:
+
+1. Enable WSL2: [Windows Subsystem for Linux Installation Guide](https://learn.microsoft.com/en-us/windows/wsl/install)
+2. Install Docker Desktop and enable WSL2 integration:
+   - Settings > Resources > WSL integration > toggle on
+3. In WSL2 terminal:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc
 ```
 
-Alternative: use Git Bash. If `devc` is not found right away, run:
+If `devc` is not found immediately, add to PATH:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
+
+**Alternative: Git Bash**
+
+Git Bash does not fully support this workflow. Use WSL2 instead for best results.
 
 ## Install from a local checkout
 

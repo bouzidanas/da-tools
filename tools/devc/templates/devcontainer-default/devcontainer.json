@@ -64,3 +64,4 @@
   "postCreateCommand": "set -a; [ -f ${containerWorkspaceFolder}/.devcontainer/devc.env ] && . ${containerWorkspaceFolder}/.devcontainer/devc.env; set +a; /usr/local/bin/container-setup.sh",
   "remoteUser": "vscode"
 }
+
