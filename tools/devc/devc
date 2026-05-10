@@ -392,11 +392,25 @@ if [ "$SUPABASE_FLAG" = "1" ]; then
         echo "Supabase project already initialized in $TARGET_DIR/supabase"
     fi
 
+    # Stop any prior local stack for this project so re-allocating ports works.
+    (cd "$TARGET_DIR" && supabase stop >/dev/null 2>&1) || true
+
+    # Force-regenerate config.toml with default ports so our rewriter (which
+    # matches the canonical 543NN values) is guaranteed to find them. We back
+    # up any existing config first in case the user customized non-port fields.
+    SUPABASE_CONFIG="$TARGET_DIR/supabase/config.toml"
+    if [ -f "$SUPABASE_CONFIG" ]; then
+        cp "$SUPABASE_CONFIG" "$SUPABASE_CONFIG.devc.bak"
+        rm -f "$SUPABASE_CONFIG"
+        # `supabase init` is idempotent; with config.toml gone it'll recreate it.
+        (cd "$TARGET_DIR" && supabase init >/dev/null 2>&1) || true
+        echo "Regenerated $SUPABASE_CONFIG (previous saved as config.toml.devc.bak)"
+    fi
+
     # ── Pick a free contiguous block of 10 ports for Supabase ──
     # Supabase reserves the range 54320-54329 by default. We allocate a fresh
-    # 10-port block (54420, 54430, 54450, …) where ALL ports are free, so
+    # 10-port block (55320, 55330, 55340, …) where ALL ports are free, so
     # multiple devc projects with --supabase don't collide on the host.
-    SUPABASE_CONFIG="$TARGET_DIR/supabase/config.toml"
     is_port_free() {
         # returns 0 if free, 1 if in use
         if command -v lsof >/dev/null 2>&1; then
@@ -421,18 +435,18 @@ if [ "$SUPABASE_FLAG" = "1" ]; then
                 echo "$base"; return 0
             fi
             base=$((base + size))
-            if [ "$base" -gt 60000 ]; then
-                echo "ERROR: could not find a free 10-port block above 54420." >&2
+            if [ "$base" -gt 64000 ]; then
+                echo "ERROR: could not find a free 10-port block above 55320." >&2
                 return 1
             fi
         done
     }
 
     if [ -f "$SUPABASE_CONFIG" ]; then
-        SB_BASE="$(pick_free_block 54420 10)" || exit 1
+        SB_BASE="$(pick_free_block 55320 10)" || exit 1
         SB_OFFSET=$((SB_BASE - 54320))
-        printf "%sAllocating Supabase port block:%s 543%02d-543%02d → %d-%d\n" \
-            "$C_DIM" "$C_RESET" 20 29 "$SB_BASE" "$((SB_BASE + 9))"
+        printf "%sAllocating Supabase port block:%s 54320-54329 → %d-%d\n" \
+            "$C_DIM" "$C_RESET" "$SB_BASE" "$((SB_BASE + 9))"
 
         # Rewrite every `port = 543NN`, `shadow_port = 543NN`, `smtp_port = 543NN`,
         # `pop3_port = 543NN` line in the config by adding SB_OFFSET. Uses awk so
