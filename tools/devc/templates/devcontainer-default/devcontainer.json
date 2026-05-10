@@ -1,8 +1,7 @@
 {
   "name": "Dev Sandbox",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+
+  "image": "mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04",
 
   // ── RESOURCE LIMITS: Prevent fork bombs / runaway processes ──
   "runArgs": [

@@ -249,8 +249,12 @@ printf "%sTarget:%s %s\n\n" "$C_DIM" "$C_RESET" "$TARGET_DIR"
 if [ -n "${DEVC_TRACE_URL:-}" ]; then
     TRACE_URL="$DEVC_TRACE_URL"
     printf "%susing DEVC_TRACE_URL from environment%s\n" "$C_DIM" "$C_RESET"
+
 else
     TRACE_URL="$(prompt_text "Trace Extractor download URL" "$DEFAULT_TRACE_URL")"
+    # Flush any extra input (e.g., trailing newlines from paste) before next prompt
+    # Works on both WSL2 and macOS
+    while IFS= read -r -t 0.01 -n 100 dummy </dev/tty 2>/dev/null; do :; done
 fi
 echo
 
