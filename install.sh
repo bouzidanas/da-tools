@@ -2,13 +2,13 @@
 # da-tools installer
 #
 # Install everything (default):
-#   curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash
 #
 # Install specific tools:
-#   curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc
+#   curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- devc
 #
 # List available tools:
-#   curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- --list
+#   curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- --list
 
 set -euo pipefail
 
@@ -21,7 +21,7 @@ if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ] \
 else
     # Running via `curl | bash` — fetch the repo to a temp dir.
     DA_REPO="${DA_REPO:-bouzidanas/da-tools}"
-    DA_REF="${DA_REF:-main}"
+    DA_REF="${DA_REF:-master}"
     TMP="$(mktemp -d)"
     trap 'rm -rf "$TMP"' EXIT
     echo "==> Downloading da-tools ($DA_REPO@$DA_REF)..."

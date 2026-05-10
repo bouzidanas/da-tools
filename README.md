@@ -7,27 +7,27 @@ A small collection of developer-experience tools.
 Install everything with one command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash
 ```
 
 Install only specific tools:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- devc
 ```
 
 List available tools:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- --list
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- --list
 ```
 
 Uninstall:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- --uninstall
 # or a single tool:
-curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- --uninstall devc
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- --uninstall devc
 ```
 
 > Executables go to `~/.local/bin`. Data files (templates, etc.) go to `~/.local/share/da-tools/`. The installer adds `~/.local/bin` to your `PATH` if needed.
@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh
 Run in Terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- devc
 ```
 
 `devc` requires Homebrew on macOS for this workflow. If `brew` is not installed, `devc` exits with an install hint. Install Homebrew first from [brew.sh](https://brew.sh/).
@@ -64,7 +64,7 @@ WSL2 provides a full Linux environment with native Docker support:
 3. In WSL2 terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- devc
 ```
 
 If `devc` is not found immediately, add to PATH:

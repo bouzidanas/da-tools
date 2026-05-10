@@ -5,7 +5,7 @@ Launch any folder as a [VS Code Dev Container](https://code.visualstudio.com/doc
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- devc
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- devc
 ```
 
 ## Usage
@@ -170,5 +170,5 @@ exec newgrp docker
 ## Uninstall
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/main/install.sh | bash -s -- --uninstall devc
+curl -fsSL https://raw.githubusercontent.com/bouzidanas/da-tools/master/install.sh | bash -s -- --uninstall devc
 ```

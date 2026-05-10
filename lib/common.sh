@@ -91,7 +91,7 @@ print_platform_notes() {
 # Returns the directory where da-tools source lives. If running via
 # `curl | bash`, downloads a tarball to a temp dir and returns that path.
 DA_REPO="${DA_REPO:-bouzidanas/da-tools}"
-DA_REF="${DA_REF:-main}"
+DA_REF="${DA_REF:-master}"
 
 resolve_source_dir() {
     # If invoked from a real file in a checkout, use that.
