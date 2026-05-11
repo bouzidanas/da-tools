@@ -1,0 +1,13 @@
+{
+  "name": "tarbox",
+  "version": "1.0.0",
+  "description": "Quick CLI to create start/end tarballs of repo folders",
+  "type": "module",
+  "bin": {
+    "tarbox": "./bin/cli.js"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
+    "chalk": "^5.3.0"
+  }
+}

@@ -91,6 +91,7 @@ cd da-tools
 | Tool | Description |
 |------|-------------|
 | [`devc`](tools/devc/README.md) | Launch any folder as a VS Code dev container with a sensible default config (Python, Node, Chrome, Playwright, Streamlit, etc.) |
+| [`tarbox`](tools/tarbox/README.md) | Quick interactive CLI to create start/end `tar` archives of repo folders |
 
 More tools coming.
 
@@ -98,6 +99,7 @@ More tools coming.
 
 - `bash`, `curl`, `tar`
 - For `devc`: VS Code with the **Dev Containers** extension, plus Docker (Docker Desktop on Windows/Mac, or native Docker on Linux/WSL2).
+- For `tarbox`: Node.js (LTS) and `npm` on `PATH`.
 
 ## Repository layout
 

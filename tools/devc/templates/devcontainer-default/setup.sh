@@ -86,10 +86,10 @@ fi
 
 # ── Python packages ──────────────────────────────────────────
 echo ""
-echo "[4/9] Installing Python packages..."
-pip install --upgrade pip
-
-pip install \
+echo "[4/9] Installing Python packages (via uv — much faster than pip)..."
+# Use uv to install into the system Python environment. uv resolves and
+# downloads in parallel and is typically 10-50x faster than pip.
+uv pip install --system --break-system-packages \
     streamlit \
     pytest \
     pytest-cov \
